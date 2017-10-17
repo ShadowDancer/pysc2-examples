@@ -12,11 +12,7 @@ from baselines.common import set_global_seeds
 import deepq_mineral_shards
 import datetime
 
-from baselines import bench
-from common.vec_env.subproc_vec_env import SubprocVecEnv
-from acktr.policies import CnnPolicy
-from acktr import acktr_disc
-from baselines.logger import Logger, TensorBoardOutputFormat, HumanOutputFormat
+from baselines.logger import Logger, HumanOutputFormat
 
 import threading
 import time
@@ -32,7 +28,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string("map", "CollectMineralShards", "Name of a map to use to play.")
 start_time = datetime.datetime.now().strftime("%Y%m%d%H%M")
 flags.DEFINE_string("log", "tensorboard", "logging type(stdout, tensorboard)")
-flags.DEFINE_string("algorithm", "acktr", "RL algorithm to use.")
+flags.DEFINE_string("algorithm", "deepq", "RL algorithm to use.")
 flags.DEFINE_integer("timesteps", 2000000, "Steps to train")
 flags.DEFINE_float("exploration_fraction", 0.5, "Exploration Fraction")
 flags.DEFINE_boolean("prioritized", True, "prioritized_replay")
@@ -69,21 +65,6 @@ def main():
       FLAGS.lr,
       start_time
     )
-  elif(FLAGS.algorithm == "acktr"):
-    logdir = "tensorboard/mineral/%s/%s_num%s_lr%s/%s" % (
-      FLAGS.algorithm,
-      FLAGS.timesteps,
-      FLAGS.num_cpu,
-      FLAGS.lr,
-      start_time
-    )
-
-  if(FLAGS.log == "tensorboard"):
-    Logger.DEFAULT \
-      = Logger.CURRENT \
-      = Logger(dir=None,
-               output_formats=[TensorBoardOutputFormat(logdir)])
-
   elif(FLAGS.log == "stdout"):
     Logger.DEFAULT \
       = Logger.CURRENT \
@@ -93,7 +74,7 @@ def main():
   if(FLAGS.algorithm == "deepq"):
 
     with sc2_env.SC2Env(
-        "CollectMineralShards",
+        map_name="CollectMineralShards",
         step_mul=step_mul,
         visualize=True) as env:
 
@@ -120,47 +101,6 @@ def main():
         callback=deepq_callback
       )
       act.save("mineral_shards.pkl")
-
-  elif(FLAGS.algorithm == "acktr"):
-
-    num_timesteps=int(40e6)
-
-    num_timesteps //= 4
-
-    seed=0
-
-    # def make_env(rank):
-    #   # env = sc2_env.SC2Env(
-    #   #   "CollectMineralShards",
-    #   #   step_mul=step_mul)
-    #   # return env
-    #   #env.seed(seed + rank)
-    #   def _thunk():
-    #     env = sc2_env.SC2Env(
-    #         map_name=FLAGS.map,
-    #         step_mul=step_mul,
-    #         visualize=True)
-    #     #env.seed(seed + rank)
-    #     if logger.get_dir():
-    #      env = bench.Monitor(env, os.path.join(logger.get_dir(), "{}.monitor.json".format(rank)))
-    #     return env
-    #   return _thunk
-
-    # agents = [Agent()
-    #           for _ in range(num_cpu)]
-    #
-    # for agent in agents:
-    #   time.sleep(1)
-    #   agent.daemon = True
-    #   agent.start()
-
-    # agent_controller = AgentController(agents)
-
-    #set_global_seeds(seed)
-    env = SubprocVecEnv(FLAGS.num_cpu, FLAGS.map)
-
-    policy_fn = CnnPolicy
-    acktr_disc.learn(policy_fn, env, seed, total_timesteps=num_timesteps, nprocs=FLAGS.num_cpu, callback=acktr_callback)
 
 from pysc2.env import environment
 import numpy as np
@@ -287,4 +227,9 @@ def acktr_callback(locals, globals):
 
 
 if __name__ == '__main__':
+  from absl import flags
+  FLAGS2 = flags.FLAGS
+  flags.DEFINE_integer("timesteps", 2000000, "Steps to train")
+  import sys
+  FLAGS2(sys.argv)
   main()
